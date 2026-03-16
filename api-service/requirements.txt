@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-multipart
+redis
+rq
+yt-dlp
+pydantic
+python-dotenv
