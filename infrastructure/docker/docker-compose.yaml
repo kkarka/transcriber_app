@@ -12,8 +12,6 @@ services:
 
   api:
     build: ../../services/api
-    ports:
-      - "8000:8000"
     environment:
       - REDIS_HOST=redis
     depends_on:
@@ -38,12 +36,20 @@ services:
 
   frontend:
     build: ../../services/frontend
-    ports:
-      - "5173:80"
     env_file:
     - ../../services/frontend/.env.docker
     depends_on:
       - api
-
+# The Master Gateway
+  gateway:
+    image: nginx:latest
+    ports:
+      - "80:80" # This is now the ONLY port exposed to your computer
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - frontend
+      
 volumes:
   whisper_models:
