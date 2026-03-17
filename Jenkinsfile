@@ -48,13 +48,14 @@ pipeline {
                 sh 'kind load docker-image transcriber-api:ci-build --name transcriber-cluster'
                 sh 'kind load docker-image transcriber-frontend:ci-build --name transcriber-cluster'
                 
-                echo "Applying Kubernetes manifests..."
-                sh 'kubectl apply -f infrastructure/kubernetes/'
+                eecho "Applying Kubernetes manifests (excluding cluster config)..."
+                // Using 'find' to apply all .yaml files EXCEPT kind-config.yaml
+                sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
                 echo "Triggering rolling updates to pull fresh images..."
-                sh 'kubectl rollout restart deployment transcriber-worker || true'
-                sh 'kubectl rollout restart deployment transcriber-api || true'
-                sh 'kubectl rollout restart deployment transcriber-frontend || true'
+                sh 'kubectl rollout restart deployment worker || true'
+                sh 'kubectl rollout restart deployment api || true'
+                sh 'kubectl rollout restart deployment frontend || true'
                 
                 echo "✅ Continuous Deployment Successful!"
             }
