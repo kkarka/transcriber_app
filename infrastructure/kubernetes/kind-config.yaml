@@ -1,0 +1,10 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: transcriber-cluster
+nodes:
+- role: control-plane
+  # This maps a specific port inside the Kubernetes cluster to your localhost:80
+  extraPortMappings:
+  - containerPort: 30080
+    hostPort: 80
+    protocol: TCP

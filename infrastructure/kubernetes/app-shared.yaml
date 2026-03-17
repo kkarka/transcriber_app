@@ -1,0 +1,22 @@
+# This file defines shared Kubernetes resources for the application, such as PersistentVolumeClaims and ConfigMaps.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  RQ_REDIS_URL: "redis://redis:6379"
+  PYTHONPATH: "/app"
+  HF_HOME: "/models/cache"
