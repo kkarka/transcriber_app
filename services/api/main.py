@@ -15,11 +15,7 @@ from pydantic import BaseModel
 from rq.command import send_stop_job_command
 
 
-app = FastAPI(
-    title="Transcriber API",
-    openapi_url="/api/openapi.json",  
-    docs_url="/api/docs"
-)
+app = FastAPI()
 
 class YoutubeRequest(BaseModel):
     url: str
