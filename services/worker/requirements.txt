@@ -5,5 +5,5 @@ faster-whisper
 redis
 rq
 av
-numpy
+numpy<2
 yt-dlp

@@ -1,4 +1,3 @@
-
 import os
 import logging
 import redis
@@ -12,70 +11,78 @@ from faster_whisper import WhisperModel
 
 logging.basicConfig(level=logging.INFO)
 
-import redis
-import time
+# -------------------------------------------------
+# 1. LAZY REDIS CONNECTION
+# -------------------------------------------------
+_redis_client = None
 
-def connect_redis():
-
-    while True:
-        try:
-            host = os.getenv("REDIS_HOST", "redis") # Defaults to "redis" for Docker
-            r = redis.StrictRedis(host=host, port=6379, decode_responses=True)
-            r.ping()
-            return r
-        except redis.exceptions.ConnectionError:
-            print("Waiting for Redis...")
-            time.sleep(2)
-
-redis_conn = connect_redis()
-
-
-# Load model once when worker starts
-model = WhisperModel(
-    "base",
-    device="cpu",
-    compute_type="int8",
-    download_root="/models"
-)
+def get_redis():
+    """Returns a Redis client, lazy-loaded so it doesn't block imports."""
+    global _redis_client
+    if _redis_client is None:
+        host = os.getenv("REDIS_HOST", "redis") # Defaults to "redis" for Docker
+        _redis_client = redis.StrictRedis(
+            host=host, 
+            port=6379, 
+            decode_responses=True,
+            socket_timeout=5 # Fails safely instead of hanging forever
+        )
+    return _redis_client
 
 
 # -------------------------------------------------
-# Smooth progress updater while transcription runs
+# 2. LAZY AI MODEL
+# -------------------------------------------------
+# Only load globally if we are NOT in a testing environment
+if os.getenv("ENV") != "testing":
+    model = WhisperModel(
+        "base",
+        device="cpu",
+        compute_type="int8",
+        download_root="/models"
+    )
+else:
+    model = None # Tests will mock this
+
+
+# -------------------------------------------------
+# 3. Smooth progress updater while transcription runs
 # -------------------------------------------------
 def fake_progress(job_id: str):
-
+    r = get_redis()
     progress = 20
 
     while progress < 90:
-
-        redis_conn.set(f"progress:{job_id}", progress)
-        redis_conn.set(f"stage:{job_id}", "Transcribing speech")
+        try:
+            r.set(f"progress:{job_id}", progress)
+            r.set(f"stage:{job_id}", "Transcribing speech")
+        except redis.exceptions.ConnectionError:
+            pass # Fail silently in background thread if Redis blips
 
         time.sleep(1)
         progress += 2
 
 
 # -------------------------------------------------
-# Main transcription job
+# 4. Main transcription job
 # -------------------------------------------------
 def transcribe(video_path: str):
-
+    r = get_redis()
     job = get_current_job()
-    job_id = job.id
+    job_id = job.id if job else "test_job" # Safety fallback for unit tests
 
     try:
-
         logging.info(f"Starting transcription: {video_path}")
 
         # Stage 1 — Preparing
-        redis_conn.set(f"progress:{job_id}", 5)
-        redis_conn.set(f"stage:{job_id}", "Preparing video")
+        r.set(f"progress:{job_id}", 5)
+        r.set(f"stage:{job_id}", "Preparing video")
 
         segments, info = model.transcribe(video_path)
 
         # Stage 2 — Extracting speech
-        redis_conn.set(f"progress:{job_id}", 15)
-        redis_conn.set(f"stage:{job_id}", "Extracting speech segments")
+        r.set(f"progress:{job_id}", 15)
+        r.set(f"stage:{job_id}", "Extracting speech segments")
 
         # Start smooth progress thread
         progress_thread = threading.Thread(
@@ -92,40 +99,41 @@ def transcribe(video_path: str):
             transcript += segment.text + " "
 
         # Stage 3 — Finalizing
-        redis_conn.set(f"progress:{job_id}", 95)
-        redis_conn.set(f"stage:{job_id}", "Finalizing transcript")
+        r.set(f"progress:{job_id}", 95)
+        r.set(f"stage:{job_id}", "Finalizing transcript")
 
         result = transcript.strip()
 
-        redis_conn.set(f"progress:{job_id}", 100)
-        redis_conn.set(
+        r.set(f"progress:{job_id}", 100)
+        r.set(
             f"stage:{job_id}",
             "Transcription complete, opening transcript..."
         )
 
         logging.info(f"Transcription finished: {video_path}")
-
         return result
 
     finally:
-
         # Clean uploaded file
         if os.path.exists(video_path):
             os.remove(video_path)
 
 
-
+# -------------------------------------------------
+# 5. YouTube Download Job
+# -------------------------------------------------
 def transcribe_youtube_job(youtube_url: str):
+    r = get_redis()
     job = get_current_job()
-    job_id = job.id
+    job_id = job.id if job else "test_job" # Safety fallback for unit tests
     
     video_id = str(uuid.uuid4())
     # Ensure this matches your UPLOAD_DIR in the container
     output_path = os.path.join("/app/uploads", f"{video_id}.%(ext)s")
 
     try:
-        redis_conn.set(f"progress:{job_id}", 2)
-        redis_conn.set(f"stage:{job_id}", "Downloading YouTube video...")
+        r.set(f"progress:{job_id}", 2)
+        r.set(f"stage:{job_id}", "Downloading YouTube video...")
 
         ydl_opts = {
             "format": "bestaudio/best",
@@ -148,5 +156,8 @@ def transcribe_youtube_job(youtube_url: str):
 
     except Exception as e:
         logging.error(f"YouTube Download Failed: {e}")
-        redis_conn.set(f"stage:{job_id}", f"Error: {str(e)}")
+        try:
+            r.set(f"stage:{job_id}", f"Error: {str(e)}")
+        except redis.exceptions.ConnectionError:
+            pass
         raise e

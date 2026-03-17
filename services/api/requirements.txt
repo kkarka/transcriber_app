@@ -6,3 +6,4 @@ rq
 yt-dlp
 pydantic
 python-dotenv
+numpy<2
