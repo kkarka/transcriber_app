@@ -9,14 +9,6 @@ pipeline {
     }
 
     stages {
-        stage('Test & QA') {
-            steps {
-                echo "Running isolated unit tests..."
-                sh 'ENV=testing pytest services/worker/test_tasks.py'
-                // Note: You can easily add pytest commands for your API here later!
-            }
-        }
-
         stage('Connect to Vault') {
             steps {
                 echo "Attempting to fetch secrets from Vault..."
@@ -32,17 +24,20 @@ pipeline {
         stage('Build Artifacts') {
             steps {
                 echo "Building ALL Microservices..."
-                
-                // 1. Build the Python Worker
+                // Build all images FIRST so we can use them for testing
                 sh 'docker build -t transcriber-worker:ci-build ./services/worker'
-                
-                // 2. Build the FastAPI Backend
                 sh 'docker build -t transcriber-api:ci-build ./services/api'
-                
-                // 3. Build the ReactJS Frontend
                 sh 'docker build -t transcriber-frontend:ci-build ./services/frontend'
-                
                 echo "✅ All Builds Complete!"
+            }
+        }
+
+        stage('Test & QA') {
+            steps {
+                echo "Running isolated unit tests INSIDE the built Worker image..."
+                // We spin up the worker image we just built, inject 'pytest', and run the test!
+                // '-u root' ensures we have permission to pip install pytest on the fly
+                sh 'docker run --rm -u root -e ENV=testing transcriber-worker:ci-build sh -c "pip install pytest && pytest test_tasks.py"'
             }
         }
         
@@ -57,7 +52,6 @@ pipeline {
                 sh 'kubectl apply -f infrastructure/kubernetes/'
                 
                 echo "Triggering rolling updates to pull fresh images..."
-                // The '|| true' ensures the pipeline doesn't fail if this is the very first deployment
                 sh 'kubectl rollout restart deployment transcriber-worker || true'
                 sh 'kubectl rollout restart deployment transcriber-api || true'
                 sh 'kubectl rollout restart deployment transcriber-frontend || true'
