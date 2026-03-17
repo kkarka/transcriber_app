@@ -48,7 +48,7 @@ pipeline {
                 sh 'kind load docker-image transcriber-api:ci-build --name transcriber-cluster'
                 sh 'kind load docker-image transcriber-frontend:ci-build --name transcriber-cluster'
                 
-                eecho "Applying Kubernetes manifests (excluding cluster config)..."
+                echo "Applying Kubernetes manifests (excluding cluster config)..."
                 // Using 'find' to apply all .yaml files EXCEPT kind-config.yaml
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
