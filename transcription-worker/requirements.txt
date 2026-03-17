@@ -1,6 +1,0 @@
-faster-whisper
-redis
-rq
-av
-torch
-numpy

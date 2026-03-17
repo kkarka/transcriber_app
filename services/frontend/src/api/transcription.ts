@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export interface UploadResponse {
   job_id: string;
@@ -30,7 +30,7 @@ export async function uploadVideo(file: File): Promise<UploadResponse> {
 
 export async function uploadYoutube(url: string) {
 
-  const response = await fetch("http://localhost:8000/transcribe-youtube", {
+  const response = await fetch(`${API_BASE}/transcribe-youtube`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -60,7 +60,7 @@ export async function checkStatus(jobId: string): Promise<StatusResponse> {
 export async function cancelJob(jobId: string) {
 
   const response = await fetch(
-    `http://localhost:8000/cancel/${jobId}`,
+    `${API_BASE}/cancel/${jobId}`,
     {
       method: "POST"
     }

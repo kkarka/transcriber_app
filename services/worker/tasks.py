@@ -4,23 +4,38 @@ import logging
 import redis
 import threading
 import time
+import yt_dlp
+import uuid
 
 from rq import get_current_job
 from faster_whisper import WhisperModel
 
 logging.basicConfig(level=logging.INFO)
 
-redis_conn = redis.StrictRedis(
-    host="localhost",
-    port=6379,
-    decode_responses=True
-)
+import redis
+import time
+
+def connect_redis():
+
+    while True:
+        try:
+            host = os.getenv("REDIS_HOST", "redis") # Defaults to "redis" for Docker
+            r = redis.StrictRedis(host=host, port=6379, decode_responses=True)
+            r.ping()
+            return r
+        except redis.exceptions.ConnectionError:
+            print("Waiting for Redis...")
+            time.sleep(2)
+
+redis_conn = connect_redis()
+
 
 # Load model once when worker starts
 model = WhisperModel(
     "base",
     device="cpu",
-    compute_type="int8"
+    compute_type="int8",
+    download_root="/models"
 )
 
 
@@ -98,3 +113,40 @@ def transcribe(video_path: str):
         if os.path.exists(video_path):
             os.remove(video_path)
 
+
+
+def transcribe_youtube_job(youtube_url: str):
+    job = get_current_job()
+    job_id = job.id
+    
+    video_id = str(uuid.uuid4())
+    # Ensure this matches your UPLOAD_DIR in the container
+    output_path = os.path.join("/app/uploads", f"{video_id}.%(ext)s")
+
+    try:
+        redis_conn.set(f"progress:{job_id}", 2)
+        redis_conn.set(f"stage:{job_id}", "Downloading YouTube video...")
+
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "wav",
+                "preferredquality": "192"
+            }],
+            "quiet": True
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([youtube_url])
+
+        audio_path = output_path.replace("%(ext)s", "wav")
+        
+        # Now call your existing transcription logic
+        return transcribe(audio_path)
+
+    except Exception as e:
+        logging.error(f"YouTube Download Failed: {e}")
+        redis_conn.set(f"stage:{job_id}", f"Error: {str(e)}")
+        raise e

@@ -1,0 +1,49 @@
+services:
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: ../../services/api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      redis:
+        condition: service_healthy # This ensures redis is fully ready first
+    volumes:
+      - ../../uploads:/app/uploads
+
+  worker:
+    build: ../../services/worker
+    environment:
+      - PYTHONPATH=/app
+      - RQ_REDIS_URL=redis://redis:6379  # This talks to the CLI
+      - REDIS_HOST=redis                 # This can be used by your code
+      - HF_HOME=/models/cache
+    depends_on:
+      redis:
+        condition: service_healthy # This ensures redis is fully ready first
+    volumes:
+      - ../../uploads:/app/uploads
+      - whisper_models:/models
+
+  frontend:
+    build: ../../services/frontend
+    ports:
+      - "5173:80"
+    env_file:
+    - ../../services/frontend/.env.docker
+    depends_on:
+      - api
+
+volumes:
+  whisper_models:

@@ -26,7 +26,7 @@ class YoutubeRequest(BaseModel):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change in production
+    allow_origins=["*"],  # # Allows port 5173 to talk to port 8000, change in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,7 +41,7 @@ MAX_FILE_SIZE = 500 * 1024 * 1024  # 500MB
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-redis_conn = Redis(host="localhost", port=6379)
+redis_conn = Redis(host="redis", port=6379)
 
 ALLOWED_EXTENSIONS = (".mp4", ".mov", ".mkv")
 
@@ -75,13 +75,13 @@ async def transcribe_video(file: UploadFile = File(...)):
     )
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        # shutil.copyfileobj(file.file, buffer)
 
         while chunk := await file.read(1024 * 1024):
             buffer.write(chunk)
             
     job = transcription_queue.enqueue(
-        "worker.transcribe",
+        "tasks.transcribe",
         file_path,
         job_timeout="30m"
     )
@@ -94,51 +94,62 @@ async def transcribe_video(file: UploadFile = File(...)):
 
 @app.post("/transcribe-youtube")
 async def transcribe_youtube(data: YoutubeRequest):
+# Just pass the URL to the worker; let the worker handle the download
+    job = transcription_queue.enqueue(
+        "tasks.transcribe_youtube_job",
+        data.url,
+        job_timeout="45m"
+    )
 
-    try:
+    return {
+        "job_id": job.id,
+        "status": "processing"
+    }
 
-        video_id = str(uuid.uuid4())
+    # try:
 
-        output_path = os.path.abspath(
-            os.path.join(
-                UPLOAD_DIR,
-                f"{video_id}.%(ext)s"
-            )
-        )
+    #     video_id = str(uuid.uuid4())
 
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192"
-            }],
-            "quiet": True
-        }
+    #     output_path = os.path.abspath(
+    #         os.path.join(
+    #             UPLOAD_DIR,
+    #             f"{video_id}.%(ext)s"
+    #         )
+    #     )
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([data.url])
+    #     ydl_opts = {
+    #         "format": "bestaudio/best",
+    #         "outtmpl": output_path,
+    #         "postprocessors": [{
+    #             "key": "FFmpegExtractAudio",
+    #             "preferredcodec": "wav",
+    #             "preferredquality": "192"
+    #         }],
+    #         "quiet": True
+    #     }
 
-        audio_path = output_path.replace("%(ext)s", "wav")
+    #     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    #         ydl.download([data.url])
 
-        job = transcription_queue.enqueue(
-            "worker.transcribe",
-            audio_path,
-            job_timeout="30m"
-        )
+    #     audio_path = output_path.replace("%(ext)s", "wav")
 
-        return {
-            "job_id": job.id,
-            "status": "processing"
-        }
+    #     job = transcription_queue.enqueue(
+    #         "worker.transcribe",
+    #         audio_path,
+    #         job_timeout="30m"
+    #     )
 
-    except Exception as e:
+    #     return {
+    #         "job_id": job.id,
+    #         "status": "processing"
+    #     }
 
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+    # except Exception as e:
+
+    #     raise HTTPException(
+    #         status_code=500,
+    #         detail=str(e)
+    #     )
 
 
 # -------------------------
