@@ -106,51 +106,6 @@ async def transcribe_youtube(data: YoutubeRequest):
         "status": "processing"
     }
 
-    # try:
-
-    #     video_id = str(uuid.uuid4())
-
-    #     output_path = os.path.abspath(
-    #         os.path.join(
-    #             UPLOAD_DIR,
-    #             f"{video_id}.%(ext)s"
-    #         )
-    #     )
-
-    #     ydl_opts = {
-    #         "format": "bestaudio/best",
-    #         "outtmpl": output_path,
-    #         "postprocessors": [{
-    #             "key": "FFmpegExtractAudio",
-    #             "preferredcodec": "wav",
-    #             "preferredquality": "192"
-    #         }],
-    #         "quiet": True
-    #     }
-
-    #     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    #         ydl.download([data.url])
-
-    #     audio_path = output_path.replace("%(ext)s", "wav")
-
-    #     job = transcription_queue.enqueue(
-    #         "worker.transcribe",
-    #         audio_path,
-    #         job_timeout="30m"
-    #     )
-
-    #     return {
-    #         "job_id": job.id,
-    #         "status": "processing"
-    #     }
-
-    # except Exception as e:
-
-    #     raise HTTPException(
-    #         status_code=500,
-    #         detail=str(e)
-    #     )
-
 
 # -------------------------
 # JOB STATUS
