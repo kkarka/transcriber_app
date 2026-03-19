@@ -23,21 +23,16 @@ pipeline {
         }
         
         stage('Build Artifacts') {
-            steps {
-                echo "Building Microservices in Parallel..."
-                // Running builds in parallel utilizes more CPU cores and finishes much faster
-                parallel(
-                    "Worker": {
-                        sh "docker build -t transcriber-worker:${IMAGE_TAG} ./services/worker"
-                    },
-                    "API": {
-                        sh "docker build -t transcriber-api:${IMAGE_TAG} ./services/api"
-                    },
-                    "Frontend": {
-                        sh "docker build -t transcriber-frontend:${IMAGE_TAG} ./services/frontend"
-                    }
-                )
-                echo "✅ All Builds Complete!"
+            parallel {
+                stage('Build Worker') {
+                    steps { sh "docker build -t transcriber-worker:${IMAGE_TAG} ./services/worker" }
+                }
+                stage('Build API') {
+                    steps { sh "docker build -t transcriber-api:${IMAGE_TAG} ./services/api" }
+                }
+                stage('Build Frontend') {
+                    steps { sh "docker build -t transcriber-frontend:${IMAGE_TAG} ./services/frontend" }
+                }
             }
         }
 
@@ -64,11 +59,13 @@ pipeline {
                 
                 echo "Restarting deployments..."
                 // Rollout restart in parallel to save time
-                parallel(
-                    "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
-                    "Restart API": { sh "kubectl rollout restart deployment api || true" },
-                    "Restart Frontend": { sh "kubectl rollout restart deployment frontend || true" }
-                )
+                script {
+                    parallel(
+                        "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
+                        "Restart API": { sh "kubectl rollout restart deployment api || true" },
+                        "Restart Frontend": { sh "kubectl rollout restart deployment frontend || true" }
+                    )
+                }
                 
                 echo "✅ Continuous Deployment Successful!"
             }
