@@ -48,7 +48,7 @@ pipeline {
         stage('Test & QA') {
             steps {
                 echo "Running unit tests..."
-                sh "docker run --rm -u root -e ENV=testing worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
+                sh "docker run --rm -u root -e ENV=testing -e PYTHONPATH=. worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
             }
         }
         
