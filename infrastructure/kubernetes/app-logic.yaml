@@ -1,3 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: transcriber-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce 
+  resources:
+    requests:
+      storage: 2Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,9 +23,17 @@ spec:
       labels:
         app: api
     spec:
+      # DB Migration/Init runs before the main app starts
+      initContainers:
+      - name: init-db
+        image: transcriber-api:ci-build
+        command: ['python', '-c', 'from database import engine; from models import Base; Base.metadata.create_all(bind=engine); print("DB Schema Synced")']
+        envFrom:
+        - configMapRef:
+            name: app-config
       containers:
       - name: api
-        image: api:local
+        image: transcriber-api:ci-build
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -27,7 +46,7 @@ spec:
       volumes:
       - name: uploads-storage
         persistentVolumeClaim:
-          claimName: uploads-pvc
+          claimName: transcriber-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -35,16 +54,6 @@ metadata:
   name: api
 spec:
   selector:
-    initContainers:
-      - name: init-db
-        image: api:local
-        command: ['python', '-c', 'from database import engine; from models import Base; import time; [Base.metadata.create_all(bind=engine) or print("DB Ready") if i==4 else time.sleep(2) for i in range(5)]']
-        envFrom:
-        - configMapRef:
-            name: app-config
-    containers:
-      - name: api
-        image: api:local
     app: api
   ports:
   - protocol: TCP
@@ -67,10 +76,16 @@ spec:
     spec:
       containers:
       - name: worker
-        image: worker:local
+        image: transcriber-worker:ci-build
         imagePullPolicy: IfNotPresent
-        command: ["/bin/sh", "-c"]
-        args: ["rq worker transcriptions --url redis://redis:6379 --path /app"]
+        # Resources are MANDATORY for HPA to work
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
         envFrom:
         - configMapRef:
             name: app-config
@@ -80,4 +95,4 @@ spec:
       volumes:
       - name: uploads-storage
         persistentVolumeClaim:
-          claimName: uploads-pvc
+          claimName: transcriber-pvc
