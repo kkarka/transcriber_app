@@ -29,17 +29,17 @@ pipeline {
             parallel {
                 stage('Build Worker') {
                     steps {
-                        retry(2) { sh "docker build -t worker:${IMAGE_TAG} ./services/worker" }
+                        retry(2) { sh "docker build -t worker:${IMAGE_TAG} -f services/worker/Dockerfile ." }
                     }
                 }
                 stage('Build API') {
                     steps {
-                        retry(2) { sh "docker build -t api:${IMAGE_TAG} ./services/api" }
+                        retry(2) { sh "docker build -t api:${IMAGE_TAG} -f services/api/Dockerfile ." }
                     }
                 }
                 stage('Build Frontend') {
                     steps {
-                        retry(2) { sh "docker build -t frontend:${IMAGE_TAG} ./services/frontend" }
+                        retry(2) { sh "docker build -t frontend:${IMAGE_TAG} -f services/frontend/Dockerfile ." }
                     }
                 }
             }
