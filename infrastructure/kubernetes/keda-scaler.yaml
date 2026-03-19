@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-keda-scaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: worker
+  minReplicaCount: 0  # Magic: Scale to ZERO when no videos are uploading!
+  maxReplicaCount: 5  # Cap the max workers so your laptop doesn't melt
+  triggers:
+  - type: redis
+    metadata:
+      address: redis:6379 # Your Redis service endpoint
+      listName: rq:queue:transcriptions # The exact RQ queue name
+      listLength: "1" # Target: 1 Worker per 1 Video in the queue
+    authenticationRef:
+      name: redis-auth # Links to the TriggerAuthentication above
