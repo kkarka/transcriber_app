@@ -137,3 +137,21 @@ echo "🔗 Jenkins: http://localhost:8080"
 echo "🔗 Vault:   http://localhost:8200 (Login Token: root)"
 echo "🔗 Ngrok:   https://nonfossiliferous-jovanni-geophilous.ngrok-free.dev (for GitHub Webhooks, Login with Jenkins Creds.)"
 echo "=========================================="
+
+
+echo "🔍 Performing Final Health Check..."
+containers=("jenkins" "vault")
+for container in "${containers[@]}"; do
+    if [ "$(docker inspect -f '{{.State.Running}}' $container)" == "true" ]; then
+        echo "✅ $container is healthy."
+    else
+        echo "❌ $container failed to start! Check 'docker logs $container'"
+    fi
+done
+
+
+# CONVENIENCE TUNNELS (OPTIONAL)
+
+echo "🛠️ To test your app, run these in new tabs:"
+echo "👉 Frontend: kubectl port-forward deployment/frontend 3000:3000"
+echo "👉 API:      kubectl port-forward deployment/api 8000:8000"

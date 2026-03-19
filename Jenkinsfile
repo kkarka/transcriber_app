@@ -5,7 +5,7 @@ pipeline {
         VAULT_URL = 'http://vault:8200' 
         KUBECONFIG = '/var/jenkins_home/.kube/config'
         // Define tags to avoid repetition
-        IMAGE_TAG = 'ci-build'
+        IMAGE_TAG = 'local'
     }
 
     stages {
@@ -13,7 +13,12 @@ pipeline {
             steps {
                 echo "Attempting to fetch secrets from Vault..."
                 withVault(configuration: [timeout: 60, vaultCredentialId: 'root', vaultUrl: "${VAULT_URL}"], 
-                          vaultSecrets: [[path: 'secret/transcriber-app', secretValues: [[envVar: 'REDIS_PASS', vaultKey: 'REDIS_PASSWORD']]]]) {
+                  vaultSecrets: [
+                      [path: 'secret/transcriber-app', secretValues: [
+                          [envVar: 'REDIS_PASS', vaultKey: 'REDIS_PASSWORD'],
+                          [envVar: 'GITHUB_TOKEN', vaultKey: 'GITHUB_TOKEN'] // Added this line
+                      ]]
+                  ]) {
                     
                     echo "✅ Successfully connected to Vault!"
                     // Use double quotes for Groovy variable interpolation
@@ -26,17 +31,13 @@ pipeline {
             steps {
                 echo "Building Microservices in Parallel..."
                 // Running builds in parallel utilizes more CPU cores and finishes much faster
-                parallel(
-                    "Worker": {
-                        sh "docker build -t transcriber-worker:${IMAGE_TAG} ./services/worker"
-                    },
-                    "API": {
-                        sh "docker build -t transcriber-api:${IMAGE_TAG} ./services/api"
-                    },
-                    "Frontend": {
-                        sh "docker build -t transcriber-frontend:${IMAGE_TAG} ./services/frontend"
-                    }
-                )
+                retry(2) { // Automatically retries the entire block if it fails
+                    parallel(
+                        "Worker":   { sh "docker build -t worker:${IMAGE_TAG} ./services/worker" },
+                        "API":      { sh "docker build -t api:${IMAGE_TAG} ./services/api" },
+                        "Frontend": { sh "docker build -t frontend:${IMAGE_TAG} ./services/frontend" }
+                    )
+                }
                 echo "✅ All Builds Complete!"
             }
         }
@@ -45,7 +46,7 @@ pipeline {
             steps {
                 echo "Running unit tests..."
                 // Optimization: Don't re-install pytest every time if you can add it to your requirements_test.txt
-                sh "docker run --rm -u root -e ENV=testing transcriber-worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
+                sh "docker run --rm -u root -e ENV=testing worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
             }
         }
         
@@ -75,9 +76,9 @@ pipeline {
                 echo "Batch loading images into KIND cluster..."
                 // THE BIG FIX: Loading multiple images in one command is 3-4x faster than separate calls
                 sh "kind load docker-image \
-                    transcriber-worker:${IMAGE_TAG} \
-                    transcriber-api:${IMAGE_TAG} \
-                    transcriber-frontend:${IMAGE_TAG} \
+                    worker:${IMAGE_TAG} \
+                    api:${IMAGE_TAG} \
+                    frontend:${IMAGE_TAG} \
                     --name transcriber-cluster"
                 
                 echo "Applying Kubernetes manifests..."
@@ -94,5 +95,16 @@ pipeline {
                 echo "✅ Continuous Deployment Successful!"
             }
         }
+    }
+}
+
+post {
+    always {
+        echo "🧹 Cleaning up workspace..."
+        cleanWs()
+    }
+    failure {
+        echo "🚨 Pipeline failed! Sending notification..."
+        // You could add an ngrok-webhook here to alert your phone/Slack
     }
 }
