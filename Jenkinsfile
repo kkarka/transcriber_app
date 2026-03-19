@@ -64,7 +64,7 @@ pipeline {
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
                 echo "Restarting deployments..."
-                // Rollout restart in parallel to save time
+                // Rollout restart in parallel to save time.
                 script {
                     parallel(
                         "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
