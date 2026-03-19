@@ -50,7 +50,14 @@ pipeline {
             steps {
                 echo "Running unit tests..."
                 // PYTHONPATH=. ensures the app code is discoverable by the test runner
-                sh "docker run --rm -u root -e ENV=testing -e PYTHONPATH=. worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
+                sh """
+                    docker run --rm -u root \
+                    -e ENV=testing \
+                    -e PYTHONPATH=/app \
+                    -w /app \
+                    worker:${IMAGE_TAG} \
+                    sh -c 'pip install pytest && pytest test_tasks.py'
+                """
             }
         }
         
