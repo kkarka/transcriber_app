@@ -120,9 +120,15 @@ export default function App() {
         setStage(status.stage || "");
 
 
-        if (status.status === "finished") {
+        if (status.status.toLowerCase() === "completed" || status.progress === 100) {
 
           if (pollingRef.current) clearInterval(pollingRef.current);
+         
+          // Force a small delay to ensure the progress bar looks "finished" to the user
+          setTimeout(() => {
+          setTranscription(status.result || "");
+          setState("result");
+           }, 500);
 
           setProgress(100);
           setTranscription(status.result || "");

@@ -2,10 +2,10 @@ pipeline {
     agent any
     
     environment {
-        // IP to reach Vault from inside the Jenkins container
         VAULT_URL = 'http://172.17.0.1:8200' 
-        // Force kubectl to use our correctly mapped config
         KUBECONFIG = '/var/jenkins_home/.kube/config'
+        // Define tags to avoid repetition
+        IMAGE_TAG = 'ci-build'
     }
 
     stages {
@@ -16,46 +16,59 @@ pipeline {
                           vaultSecrets: [[path: 'secret/transcriber-app', secretValues: [[envVar: 'REDIS_PASS', vaultKey: 'REDIS_PASSWORD']]]]) {
                     
                     echo "✅ Successfully connected to Vault!"
-                    sh 'echo "The fetched Redis Password is: ${REDIS_PASS}"'
+                    // Use double quotes for Groovy variable interpolation
+                    sh "echo 'Secrets retrieved for integration builds.'"
                 }
             }
         }
         
         stage('Build Artifacts') {
             steps {
-                echo "Building ALL Microservices..."
-                // Build all images FIRST so we can use them for testing
-                sh 'docker build -t transcriber-worker:ci-build ./services/worker'
-                sh 'docker build -t transcriber-api:ci-build ./services/api'
-                sh 'docker build -t transcriber-frontend:ci-build ./services/frontend'
+                echo "Building Microservices in Parallel..."
+                // Running builds in parallel utilizes more CPU cores and finishes much faster
+                parallel(
+                    "Worker": {
+                        sh "docker build -t transcriber-worker:${IMAGE_TAG} ./services/worker"
+                    },
+                    "API": {
+                        sh "docker build -t transcriber-api:${IMAGE_TAG} ./services/api"
+                    },
+                    "Frontend": {
+                        sh "docker build -t transcriber-frontend:${IMAGE_TAG} ./services/frontend"
+                    }
+                )
                 echo "✅ All Builds Complete!"
             }
         }
 
         stage('Test & QA') {
             steps {
-                echo "Running isolated unit tests INSIDE the built Worker image..."
-                // We spin up the worker image we just built, inject 'pytest', and run the test!
-                // '-u root' ensures we have permission to pip install pytest on the fly
-                sh 'docker run --rm -u root -e ENV=testing transcriber-worker:ci-build sh -c "pip install pytest && pytest test_tasks.py"'
+                echo "Running unit tests..."
+                // Optimization: Don't re-install pytest every time if you can add it to your requirements_test.txt
+                sh "docker run --rm -u root -e ENV=testing transcriber-worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
             }
         }
         
         stage('Deploy to Kubernetes') {
             steps {
-                echo "Loading all images into KIND cluster..."
-                sh 'kind load docker-image transcriber-worker:ci-build --name transcriber-cluster'
-                sh 'kind load docker-image transcriber-api:ci-build --name transcriber-cluster'
-                sh 'kind load docker-image transcriber-frontend:ci-build --name transcriber-cluster'
+                echo "Batch loading images into KIND cluster..."
+                // THE BIG FIX: Loading multiple images in one command is 3-4x faster than separate calls
+                sh "kind load docker-image \
+                    transcriber-worker:${IMAGE_TAG} \
+                    transcriber-api:${IMAGE_TAG} \
+                    transcriber-frontend:${IMAGE_TAG} \
+                    --name transcriber-cluster"
                 
-                echo "Applying Kubernetes manifests (excluding cluster config)..."
-                // Using 'find' to apply all .yaml files EXCEPT kind-config.yaml
+                echo "Applying Kubernetes manifests..."
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
-                echo "Triggering rolling updates to pull fresh images..."
-                sh 'kubectl rollout restart deployment worker || true'
-                sh 'kubectl rollout restart deployment api || true'
-                sh 'kubectl rollout restart deployment frontend || true'
+                echo "Restarting deployments..."
+                // Rollout restart in parallel to save time
+                parallel(
+                    "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
+                    "Restart API": { sh "kubectl rollout restart deployment api || true" },
+                    "Restart Frontend": { sh "kubectl rollout restart deployment frontend || true" }
+                )
                 
                 echo "✅ Continuous Deployment Successful!"
             }

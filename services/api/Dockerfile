@@ -1,29 +1,36 @@
 # ---------- Builder Stage ----------
 FROM python:3.10-slim AS builder
 
-WORKDIR /install
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
-COPY requirements.txt .
+WORKDIR /app
+
+# Create a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY services/api/requirements.txt .
 
 RUN pip install --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r requirements.txt
-
+    pip install --no-cache-dir -r requirements.txt
 
 # ---------- Runtime Stage ----------
 FROM python:3.10-slim
 
+# Create user first
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 WORKDIR /app
 
-# 1. Manually create the uploads directory
-RUN mkdir -p /app/uploads
+# Enable the venv in the runtime image
+ENV PATH="/opt/venv/bin:$PATH"
 
-COPY --from=builder /install /usr/local
-COPY . .
+# Create uploads directory and set permissions
+RUN mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
 
-# 2. Ensure appuser owns the whole /app directory, including uploads
-RUN chown -R appuser:appgroup /app
+COPY --chown=appuser:appgroup --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appgroup services/api /app
+COPY --chown=appuser:appgroup services/common /shared
 
 USER appuser
 

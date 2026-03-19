@@ -35,6 +35,16 @@ metadata:
   name: api
 spec:
   selector:
+    initContainers:
+      - name: init-db
+        image: api:local
+        command: ['python', '-c', 'from database import engine; from models import Base; import time; [Base.metadata.create_all(bind=engine) or print("DB Ready") if i==4 else time.sleep(2) for i in range(5)]']
+        envFrom:
+        - configMapRef:
+            name: app-config
+    containers:
+      - name: api
+        image: api:local
     app: api
   ports:
   - protocol: TCP
@@ -59,6 +69,8 @@ spec:
       - name: worker
         image: worker:local
         imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args: ["rq worker transcriptions --url redis://redis:6379 --path /app"]
         envFrom:
         - configMapRef:
             name: app-config
