@@ -44,9 +44,15 @@ pipeline {
 
         stage('Test & QA') {
             steps {
-                echo "Running unit tests..."
-                // Optimization: Don't re-install pytest every time if you can add it to your requirements_test.txt
-                sh "docker run --rm -u root -e ENV=testing transcriber-worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
+                echo "Running unit tests with updated PYTHONPATH..."
+                // We add /app and /shared to the PYTHONPATH so imports work correctly
+                sh """
+                    docker run --rm -u root \
+                    -e ENV=testing \
+                    -e PYTHONPATH=/app:/shared \
+                    transcriber-worker:${IMAGE_TAG} \
+                    sh -c 'pip install pytest && pytest test_tasks.py'
+                """
             }
         }
         
