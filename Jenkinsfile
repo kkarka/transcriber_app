@@ -11,6 +11,7 @@ pipeline {
         stage('Connect to Vault') {
             steps {
                 echo "Attempting to fetch secrets from Vault..."
+                // Keeping these inside the environment so they are available to all stages
                 withVault(configuration: [timeout: 60, vaultCredentialId: 'root', vaultUrl: "${VAULT_URL}"], 
                   vaultSecrets: [
                       [path: 'secret/transcriber-app', secretValues: [
@@ -19,13 +20,13 @@ pipeline {
                       ]]
                   ]) {
                     echo "✅ Successfully connected to Vault!"
-                    sh "echo 'Secrets retrieved for integration builds.'"
+                    // We don't echo the actual secrets here for security
+                    sh "echo 'Secrets retrieved and masked for security.'"
                 }
             }
         }
         
         stage('Build Artifacts') {
-            // Using Declarative parallel stages for better visualization and stability
             parallel {
                 stage('Build Worker') {
                     steps {
@@ -48,6 +49,7 @@ pipeline {
         stage('Test & QA') {
             steps {
                 echo "Running unit tests..."
+                // PYTHONPATH=. ensures the app code is discoverable by the test runner
                 sh "docker run --rm -u root -e ENV=testing -e PYTHONPATH=. worker:${IMAGE_TAG} sh -c 'pip install pytest && pytest test_tasks.py'"
             }
         }
@@ -73,19 +75,23 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 echo "Batch loading images into KIND cluster..."
-                sh "kind load docker-image worker:${IMAGE_TAG} api:${IMAGE_TAG} frontend:${IMAGE_TAG} --name transcriber-cluster"
+                // Breaking this into multiple lines ensures the shell interprets it correctly
+                sh """
+                    kind load docker-image worker:${IMAGE_TAG} --name transcriber-cluster
+                    kind load docker-image api:${IMAGE_TAG} --name transcriber-cluster
+                    kind load docker-image frontend:${IMAGE_TAG} --name transcriber-cluster
+                """
                 
                 echo "Applying Kubernetes manifests..."
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
-                echo "Restarting deployments..."
-                // Simple one-liner rollout for all services
+                echo "Restarting deployments to pick up new images..."
                 sh "kubectl rollout restart deployment worker api frontend || true"
                 
                 echo "✅ Continuous Deployment Successful!"
             }
         }
-    } // End of Stages
+    }
 
     post {
         always {
@@ -93,7 +99,7 @@ pipeline {
             cleanWs()
         }
         failure {
-            echo "🚨 Pipeline failed! Sending notification..."
+            echo "🚨 Pipeline failed! Check the console output above."
         }
     }
-} // End of Pipeline
+}
