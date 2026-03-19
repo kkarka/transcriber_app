@@ -12,7 +12,7 @@ spec:
   triggers:
   - type: redis
     metadata:
-      address: redis:6379 # Your Redis service endpoint
+      address: redis.default.svc.cluster.local:6379 # Your Redis service endpoint
       listName: rq:queue:transcriptions # The exact RQ queue name
       listLength: "1" # Target: 1 Worker per 1 Video in the queue
     authenticationRef:

@@ -56,6 +56,27 @@ pipeline {
             }
         }
         
+        stage('Deploy Cluster Prerequisites') {
+            steps {
+                echo "Installing/Updating Metrics Server..."
+                sh '''
+                    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+                    # Patch Metrics Server to work with local Kind TLS certificates
+                    kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' || true
+                '''
+
+                echo "Installing/Updating KEDA via Helm..."
+                sh '''
+                    helm repo add kedacore https://kedacore.github.io/charts
+                    helm repo update
+                    
+                    # 'upgrade --install' ensures the pipeline doesn't fail if KEDA is already installed
+                    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --wait
+                '''
+                echo "✅ Infrastructure Prerequisites Ready!"
+            }
+        }
+        
         stage('Deploy to Kubernetes') {
             steps {
                 echo "Batch loading images into KIND cluster..."
