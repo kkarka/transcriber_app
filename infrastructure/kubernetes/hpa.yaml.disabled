@@ -1,3 +1,5 @@
+# Disabling HPA since we are using KEDA, f you want to use HPA then remove .disabled in the file name.
+
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
