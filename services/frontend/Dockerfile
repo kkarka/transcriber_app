@@ -3,11 +3,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY services/frontend/package*.json ./
 # Use ci for faster, cleaner, deterministic builds in automated pipelines
 RUN npm ci 
 
-COPY . .
+COPY services/frontend .
 RUN npm run build
 
 # ---------- Runtime Stage ----------
@@ -15,7 +15,7 @@ RUN npm run build
 FROM nginxinc/nginx-unprivileged:alpine
 
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY services/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy the built React/Vue app
 COPY --from=builder /app/dist /usr/share/nginx/html

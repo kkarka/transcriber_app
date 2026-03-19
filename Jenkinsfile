@@ -41,6 +41,7 @@ pipeline {
                 echo "✅ All Builds Complete!"
             }
         }
+    }
 
         stage('Test & QA') {
             steps {
@@ -85,12 +86,14 @@ pipeline {
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
                 echo "Restarting deployments..."
-                // Rollout restart in parallel to save time
-                parallel(
-                    "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
-                    "Restart API": { sh "kubectl rollout restart deployment api || true" },
-                    "Restart Frontend": { sh "kubectl rollout restart deployment frontend || true" }
-                )
+                // Rollout restart in parallel to save time.
+                script {
+                    parallel(
+                        "Restart Worker": { sh "kubectl rollout restart deployment worker || true" },
+                        "Restart API": { sh "kubectl rollout restart deployment api || true" },
+                        "Restart Frontend": { sh "kubectl rollout restart deployment frontend || true" }
+                    )
+                }
                 
                 echo "✅ Continuous Deployment Successful!"
             }
