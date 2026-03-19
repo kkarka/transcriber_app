@@ -1,0 +1,9 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-auth
+spec:
+  secretTargetRef:
+  - parameter: password     # The parameter KEDA's Redis scaler expects
+    name: transcriber-secrets # The name of your K8s Secret
+    key: REDIS_PASS         # The exact key inside that Secret
