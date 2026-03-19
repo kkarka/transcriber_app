@@ -22,19 +22,25 @@ pipeline {
             }
         }
         
-        stage('Build Artifacts') {
-            parallel {
-                stage('Build Worker') {
-                    steps { sh "docker build -t transcriber-worker:${IMAGE_TAG} ./services/worker" }
+    stage('Build Artifacts') {
+        parallel {
+            stage('Build Worker') {
+                steps { 
+                    sh "docker build -t transcriber-worker:${IMAGE_TAG} -f services/worker/Dockerfile ." 
                 }
-                stage('Build API') {
-                    steps { sh "docker build -t transcriber-api:${IMAGE_TAG} ./services/api" }
+            }
+            stage('Build API') {
+                steps { 
+                    sh "docker build -t transcriber-api:${IMAGE_TAG} -f services/api/Dockerfile ." 
                 }
-                stage('Build Frontend') {
-                    steps { sh "docker build -t transcriber-frontend:${IMAGE_TAG} ./services/frontend" }
+            }
+            stage('Build Frontend') {
+                steps { 
+                    sh "docker build -t transcriber-frontend:${IMAGE_TAG} -f services/frontend/Dockerfile ." 
                 }
             }
         }
+    }
 
         stage('Test & QA') {
             steps {
