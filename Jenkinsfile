@@ -98,16 +98,17 @@ pipeline {
                 echo "✅ Continuous Deployment Successful!"
             }
         }
-    }
-}
+    
 
-post {
-    always {
-        echo "🧹 Cleaning up workspace..."
-        cleanWs()
+    post {
+        always {
+            echo "🧹 Cleaning up workspace..."
+            cleanWs()
+        }
+        failure {
+            echo "🚨 Pipeline failed! Sending notification..."
+            // You could add an ngrok-webhook here to alert your phone/Slack
+        }
     }
-    failure {
-        echo "🚨 Pipeline failed! Sending notification..."
-        // You could add an ngrok-webhook here to alert your phone/Slack
-    }
+
 }
