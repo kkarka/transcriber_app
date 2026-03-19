@@ -71,12 +71,6 @@ Thumbs.db
 models/
 cache/
 
-# -------------------------
-# OS files
-# -------------------------
-.DS_Store
-Thumbs.db
-
 # ------------------------------
 # Terraform (future)
 # ------------------------------
@@ -95,5 +89,16 @@ coverage/
 # -------------------------
 docker-compose.override.yml
 
-#kube-config
-internal-config.yaml
+# Ignore manual local kubeconfigs
+jenkins-kubeconfig.yaml
+
+# -------------------------
+# Security & Credentials
+# -------------------------
+# Ignore all generic private keys and certificates
+*.pem
+*.key
+*.crt
+*.rsa
+*.pub
+*.p12
