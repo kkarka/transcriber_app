@@ -129,57 +129,20 @@ cd ai-video-transcriber
 
 ---
 
-## 2. Start Redis
+## 2. Local Setup
 
-Redis must be running for background jobs.
-
-```
-redis-server
-```
-
----
-
-## 3. Start Backend
+For Developer Environment run this script to setup local environment
 
 ```
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-Backend will start at:
-
-```
-http://localhost:8000
+cd scripts
+./dev.sh
 ```
 
 ---
 
-## 4. Start Worker
-
-In another terminal:
-
+For cleanup run this script
 ```
-cd backend
-rq worker
-```
-
-The worker will process transcription jobs.
-
----
-
-## 5. Start Frontend
-
-```
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs at:
-
-```
-http://localhost:5173
+./cleanup.sh
 ```
 
 ---

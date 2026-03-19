@@ -27,4 +27,3 @@
 # Environment & Secrets
 **/.env
 **/.env.*
-infrastructure/vault/data/

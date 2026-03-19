@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        VAULT_URL = 'http://172.17.0.1:8200' 
+        VAULT_URL = 'http://vault:8200' 
         KUBECONFIG = '/var/jenkins_home/.kube/config'
         // Define tags to avoid repetition
         IMAGE_TAG = 'ci-build'
@@ -12,7 +12,7 @@ pipeline {
         stage('Connect to Vault') {
             steps {
                 echo "Attempting to fetch secrets from Vault..."
-                withVault(configuration: [timeout: 60, vaultCredentialId: 'vault-dev-token', vaultUrl: "${VAULT_URL}"], 
+                withVault(configuration: [timeout: 60, vaultCredentialId: 'root', vaultUrl: "${VAULT_URL}"], 
                           vaultSecrets: [[path: 'secret/transcriber-app', secretValues: [[envVar: 'REDIS_PASS', vaultKey: 'REDIS_PASSWORD']]]]) {
                     
                     echo "✅ Successfully connected to Vault!"
