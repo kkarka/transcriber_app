@@ -6,7 +6,7 @@ export interface UploadResponse {
 }
 
 export interface StatusResponse {
-  status: "processing" | "finished" | "failed";
+  status: "processing" | "completed" | "failed";
   progress: number;
   result?: string;
   stage: string;
