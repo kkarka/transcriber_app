@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileVideo } from "lucide-react";
+import { FileVideo, Loader2 } from "lucide-react";
 import { UploadSection } from "./components/UploadSection";
 import { ProcessingView } from "./components/ProcessingView";
 import { TranscriptionResult } from "./components/TranscriptionResult";
@@ -11,6 +11,7 @@ type AppState = "upload" | "processing" | "result";
 
 export default function App() {
   const [state, setState] = useState<AppState>("upload");
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [fileName, setFileName] = useState("");
   const [transcription, setTranscription] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
@@ -125,14 +126,26 @@ export default function App() {
           if (pollingRef.current) clearInterval(pollingRef.current);
          
           // Force a small delay to ensure the progress bar looks "finished" to the user
-          setTimeout(() => {
-          setTranscription(status.result || "");
-          setState("result");
-           }, 500);
+          // setTimeout(() => {
+          // setTranscription(status.result || "");
+          // setState("result");
+          //  }, 500);
 
+          // setProgress(100);
+          // setTranscription(status.result || "");
+          // setState("result");
           setProgress(100);
-          setTranscription(status.result || "");
-          setState("result");
+          setIsFinalizing(true);
+
+          // FIX 1: Safely check multiple possible keys your Python API might be sending
+          const backendData = status as any;
+          const finalText = status.transcription || status.result || status.text || "Transcription completed, but no text was returned.";
+
+          // FIX 2: Properly wait 500ms before changing the screen so the 100% bar is visible
+          setTimeout(() => {
+            setTranscription(finalText);
+            setState("result");
+          }, 1500);
         }
 
         if (status.status === "failed") {
@@ -167,6 +180,7 @@ export default function App() {
       setTranscription("");
       setJobId(null);
       setProgress(0);
+      setIsFinalizing(false);
 
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
@@ -185,6 +199,7 @@ export default function App() {
 
     setState("upload");
     setProgress(0);
+    setIsFinalizing(false);
   };
 
   return (
@@ -214,13 +229,21 @@ export default function App() {
             onError={(msg) => setError(msg)} />
         )}
 
-        {state === "processing" && (
+        {state === "processing" && !isFinalizing && (
           <ProcessingView
             fileName={fileName}
             progress={displayProgress}
             stage={stage}
             onCancel={handleCancel}
           />
+        )}
+        
+        {state === "processing" && isFinalizing && (
+          <div className="flex flex-col items-center justify-center py-24 space-y-4 animate-in fade-in duration-500">
+            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+            <h2 className="text-xl font-semibold">Finalizing Transcription...</h2>
+            <p className="text-muted-foreground">Formatting your text for display</p>
+          </div>
         )}
 
         {state === "result" && (
