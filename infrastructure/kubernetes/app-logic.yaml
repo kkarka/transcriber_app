@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: transcriber-pvc
+  name: uploads-pvc
 spec:
   accessModes:
-    - ReadWriteOnce 
+    - ReadWriteMany
   resources:
     requests:
       storage: 2Gi
@@ -46,7 +46,7 @@ spec:
       volumes:
       - name: uploads-storage
         persistentVolumeClaim:
-          claimName: transcriber-pvc
+          claimName: uploads-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -95,4 +95,4 @@ spec:
       volumes:
       - name: uploads-storage
         persistentVolumeClaim:
-          claimName: transcriber-pvc
+          claimName: uploads-pvc
