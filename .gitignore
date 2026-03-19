@@ -94,3 +94,6 @@ coverage/
 # Docker
 # -------------------------
 docker-compose.override.yml
+
+#kube-config
+internal-config.yaml
