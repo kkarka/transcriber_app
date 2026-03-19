@@ -18,9 +18,12 @@ logger = logging.getLogger(__name__)
 # 1. DATABASE RESILIENCE
 # -------------------------------------------------
 # This pauses the worker on startup until Postgres is actually ready
-if not wait_for_db():
-    logger.critical("Worker could not connect to Database. Exiting.")
-    exit(1)
+if os.getenv("ENV") != "testing":
+    if not wait_for_db():
+        logger.critical("Worker could not connect to Database. Exiting.")
+        exit(1)
+else:
+    logger.info("Skipping database connectivity check for Testing Environment.")
 
 # -------------------------------------------------
 # 2. REDIS CONNECTION
