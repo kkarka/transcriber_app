@@ -10,6 +10,8 @@ export interface StatusResponse {
   progress: number;
   result?: string;
   stage: string;
+  transcription?: string; 
+  text?: string;
 }
 
 export async function uploadVideo(file: File): Promise<UploadResponse> {
