@@ -1,15 +1,4 @@
-# This file defines shared Kubernetes resources for the application, such as PersistentVolumeClaims and ConfigMaps.
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: uploads-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
+# This file defines shared Kubernetes resources for the application, such as ConfigMaps.
 apiVersion: v1
 kind: ConfigMap
 metadata:
