@@ -20,7 +20,7 @@ pipeline {
                       ]]
                   ]) {
                     echo "✅ Successfully connected to Vault!"
-                    
+
                     echo "Injecting secrets into Kubernetes..."
                     sh """
                         # Create the secret cleanly (updates it if it already exists)
@@ -73,7 +73,7 @@ pipeline {
             steps {
                 echo "Installing/Updating Metrics Server..."
                 sh '''
-                    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+                    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml || true
                     kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' || true
                 '''
 
