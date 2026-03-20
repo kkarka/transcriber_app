@@ -53,7 +53,7 @@ pipeline {
                 sh """
                     docker run --rm -u root \
                     -e ENV=testing \
-                    -e PYTHONPATH=/app \
+                    -e PYTHONPATH=/app:/shared \
                     -w /app \
                     worker:${IMAGE_TAG} \
                     sh -c 'pip install pytest && pytest test_tasks.py'
