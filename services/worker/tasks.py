@@ -110,13 +110,15 @@ def transcribe(job_id: str, video_path: str):
             r.set(f"stage:{job_id}", "Extracting text...")
 
         full_transcript = " ".join(transcript_parts).strip()
-
+        
+        # Save the final transcript to Postgres FIRST
+        update_db_job(job_id, models.JobStatus.COMPLETED, transcript=full_transcript)
+        logger.info(f"Job {job_id} completed successfully.")
+        
         # Finalize
         r.set(f"progress:{job_id}", 100)
         r.set(f"stage:{job_id}", "Complete")
         
-        update_db_job(job_id, models.JobStatus.COMPLETED, transcript=full_transcript)
-        logger.info(f"Job {job_id} completed successfully.")
         return full_transcript
 
     except Exception as e:
