@@ -20,8 +20,16 @@ pipeline {
                       ]]
                   ]) {
                     echo "✅ Successfully connected to Vault!"
-                    // We don't echo the actual secrets here for security
-                    sh "echo 'Secrets retrieved and masked for security.'"
+                    
+                    echo "Injecting secrets into Kubernetes..."
+                    sh """
+                        # Create the secret cleanly (updates it if it already exists)
+                        kubectl create secret generic transcriber-secrets \
+                          --from-literal=REDIS_PASS=\$REDIS_PASS \
+                          --from-literal=GITHUB_TOKEN=\$GITHUB_TOKEN \
+                          --dry-run=client -o yaml | kubectl apply -f -
+                    """
+                    sh "echo '✅ Secrets safely injected into Kubernetes!'"
                 }
             }
         }
