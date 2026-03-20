@@ -22,6 +22,10 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 WORKDIR /app
 
+# Python optimizations for containers
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 # Enable the venv in the runtime image
 ENV PATH="/opt/venv/bin:$PATH"
 

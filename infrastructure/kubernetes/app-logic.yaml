@@ -75,6 +75,7 @@ spec:
       labels:
         app: worker
     spec:
+      terminationGracePeriodSeconds: 1800 # Tell K8s to wait up to 30 mins for the pod to finish its job before killing it!
       containers:
       - name: worker
         image: worker:local
