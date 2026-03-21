@@ -1,0 +1,23 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fastapi-monitor
+  # It is best practice to put this in the same namespace as your app
+  namespace: monitoring 
+  labels:
+    # 🌟 CRITICAL: This label MUST match the Helm release name you used ("prometheus")
+    # If this is missing, the Prometheus Operator will completely ignore this file!
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      # 🌟 CRITICAL: This must match the labels on your existing api Service
+      app: api 
+  namespaceSelector:
+    # Looks for the service in all namespaces
+    any: true
+  endpoints:
+    # 🌟 CRITICAL: This must match the string 'name' of the port in your api Service
+    - port: http 
+      path: /metrics
+      interval: 15s
