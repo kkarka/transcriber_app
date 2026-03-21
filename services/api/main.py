@@ -5,6 +5,7 @@ import uuid
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from redis import Redis
 from rq.job import Job
@@ -33,6 +34,12 @@ async def lifespan(app: FastAPI):
     yield
     # Anything below 'yield' runs during server shutdown
 app = FastAPI(title="Transcriber App", version="1.0.0", lifespan=lifespan)
+
+
+# -------------------------
+# METRICS (PROMETHEUS)
+# -------------------------
+Instrumentator().instrument(app).expose(app)
 
 # -------------------------
 # PYDANTIC CONTRACTS

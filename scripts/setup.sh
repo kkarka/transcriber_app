@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 # SAFETY CHECK: Force the script to run from the project root directory
 cd "$(dirname "$0")/.." || exit
 echo "📂 Working directory set to: $(pwd)"
@@ -64,13 +66,20 @@ else
 fi
 
 echo "⏳ Waiting for Vault to fully initialize..."
+VAULT_READY=false
 for i in {1..30}; do
     if docker exec -e VAULT_ADDR=http://127.0.0.1:8200 vault vault status > /dev/null 2>&1; then
         echo "✅ Vault is online and ready!"
+        VAULT_READY=true
         break
     fi
     sleep 2
 done
+
+if [ "$VAULT_READY" = false ]; then
+    echo "❌ Vault failed to initialize in time. Exiting."
+    exit 1
+fi
 
 echo "💉 Injecting Redis secret into Vault..."
 docker exec -e VAULT_ADDR=http://127.0.0.1:8200 -e VAULT_TOKEN=root vault vault kv put secret/transcriber-app REDIS_PASSWORD="$REDIS_SECRET" GITHUB_TOKEN="$GITHUB_SECRET" > /dev/null 2>&1
@@ -82,8 +91,16 @@ unset GITHUB_SECRET
 # ==========================================
 # 3. JENKINS
 # ==========================================
-echo "🏗️ Building custom Jenkins Docker image..."
-docker build --no-cache -t custom-jenkins-devops -f infrastructure/jenkins/Dockerfile .
+echo "🏗️ Checking for custom Jenkins Docker image..."
+
+# Check if the image exists locally
+if [[ "$(docker images -q custom-jenkins-devops:latest 2> /dev/null)" == "" ]]; then
+    echo "📦 Image not found. Building custom Jenkins image..."
+    docker build -t custom-jenkins-devops -f infrastructure/jenkins/Dockerfile .
+else
+    echo "✅ Custom Jenkins image already exists. Skipping build."
+    echo "💡 Tip: Run 'docker rmi custom-jenkins-devops' if you need to force a rebuild."
+fi
 
 FRESH_START=false
 if [ -z "$(docker volume ls -q -f name=^jenkins_home$)" ]; then
@@ -112,12 +129,13 @@ else
       -p 8080:8080 -p 50000:50000 \
       -v jenkins_home:/var/jenkins_home \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -v $(pwd)/jenkins-kubeconfig.yaml:/var/jenkins_home/.kube/config \
+      -v "${PWD}/jenkins-kubeconfig.yaml":/var/jenkins_home/.kube/config \
       custom-jenkins-devops
 fi
 
 if [ "$FRESH_START" = true ]; then
     echo "⏳ Waiting for Jenkins to boot and generate the initial password (this takes about 20-40 seconds)..."
+    JENKINS_READY=false
     for i in {1..30}; do
         if docker exec jenkins test -f /var/jenkins_home/secrets/initialAdminPassword 2>/dev/null; then
             JENKINS_PASS=$(docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword)
@@ -127,10 +145,16 @@ if [ "$FRESH_START" = true ]; then
             echo -e "\033[1;32m$JENKINS_PASS\033[0m" 
             echo "Copy this password and go to http://localhost:8080"
             echo "=========================================="
+            JENKINS_READY=true
             break
         fi
         sleep 2
     done
+
+    if [ "$JENKINS_READY" = false ]; then
+        echo "❌ Jenkins failed to initialize in time. Check 'docker logs jenkins'. Exiting."
+        exit 1
+    fi
 else
     echo "=========================================="
     echo "🔐 JENKINS LOGIN"
@@ -151,12 +175,39 @@ else
 fi
 
 
+# ==========================================
+# 5. MONITORING (PROMETHEUS & GRAFANA)
+# ==========================================
+echo "📊 Setting up Prometheus & Grafana..."
+if ! command -v helm &> /dev/null; then
+    echo "⚠️ Helm is not installed. Skipping Prometheus/Grafana setup."
+    echo "   To install helm: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+else
+    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+    
+    if helm ls -n monitoring | grep -q prometheus; then
+        echo "✅ Prometheus/Grafana stack is already installed."
+    else
+        echo "🚀 Installing kube-prometheus-stack..."
+        helm install prometheus prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --set grafana.adminPassword=admin
+    fi
+fi
+
+echo "📈 Applying custom Prometheus ServiceMonitors and Grafana Dashboards..."
+mkdir -p infrastructure/kubernetes/monitoring
+kubectl apply -f infrastructure/kubernetes/monitoring/ -n monitoring || echo "⚠️ Could not apply custom monitoring manifests."
+
 echo "=========================================="
 echo "✅ ENVIRONMENT FULLY PROVISIONED!"
 echo "=========================================="
 echo "🔗 Jenkins:       http://localhost:8080"
 echo "🔗 Vault:         http://localhost:8200 (Login Token: root)"
 echo "🔗 GitHub Webhook: https://nonfossiliferous-jovanni-geophilous.ngrok-free.dev"
+echo "🔗 Grafana:       Run 'kubectl port-forward --address 0.0.0.0 svc/prometheus-grafana 3000:80 -n monitoring'"
 echo "=========================================="
 
 echo "🔍 Performing Final Health Check..."
