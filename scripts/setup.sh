@@ -193,13 +193,12 @@ else
         echo "🚀 Installing kube-prometheus-stack..."
         helm install prometheus prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
-            --set grafana.adminPassword=admin
+            --set grafana.adminPassword=admin \
+            --set "grafana.grafana\.ini.server.root_url=%(protocol)s://%(domain)s:%(http_port)s/grafana/" \
+            --set "grafana.grafana\.ini.server.serve_from_sub_path=true"
     fi
 fi
 
-echo "📈 Applying custom Prometheus ServiceMonitors and Grafana Dashboards..."
-mkdir -p infrastructure/kubernetes/monitoring
-kubectl apply -f infrastructure/kubernetes/monitoring/ -n monitoring || echo "⚠️ Could not apply custom monitoring manifests."
 
 echo "=========================================="
 echo "✅ ENVIRONMENT FULLY PROVISIONED!"
@@ -207,7 +206,7 @@ echo "=========================================="
 echo "🔗 Jenkins:       http://localhost:8080"
 echo "🔗 Vault:         http://localhost:8200 (Login Token: root)"
 echo "🔗 GitHub Webhook: https://nonfossiliferous-jovanni-geophilous.ngrok-free.dev"
-echo "🔗 Grafana:       Run 'kubectl port-forward --address 0.0.0.0 svc/prometheus-grafana 3000:80 -n monitoring'"
+echo "🔗 Grafana:        http://localhost/grafana"
 echo "=========================================="
 
 echo "🔍 Performing Final Health Check..."
