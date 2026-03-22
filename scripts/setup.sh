@@ -65,11 +65,12 @@ fi
 echo "⏳ Waiting for Vault to fully initialize..."
 VAULT_READY=false
 for i in {1..30}; do
-    if curl -s http://127.0.0.1:8200/v1/sys/health | grep -q '"initialized":true'; then
+    if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8200/v1/sys/health | grep -q "200"; then
         echo "✅ Vault is online and ready!"
         VAULT_READY=true
         break
     fi
+    echo -n "."
     sleep 2
 done
 
