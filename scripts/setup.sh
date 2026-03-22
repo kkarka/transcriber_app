@@ -193,9 +193,7 @@ else
         echo "🚀 Installing kube-prometheus-stack..."
         helm install prometheus prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
-            --set grafana.adminPassword=admin \
-            --set "grafana.grafana\.ini.server.root_url=%(protocol)s://%(domain)s:%(http_port)s/grafana" \
-            --set "grafana.grafana\.ini.server.serve_from_sub_path=true"
+            -f infrastructure/kubernetes/grafana-values.yaml
     fi
 fi
 
