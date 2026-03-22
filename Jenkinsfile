@@ -101,7 +101,7 @@ pipeline {
                 sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
                 
                 echo "Restarting deployments to pick up new images..."
-                sh "kubectl rollout restart deployment worker api frontend || true"
+                sh "kubectl rollout restart deployment worker api frontend gateway || true"
                 
                 echo "✅ Continuous Deployment Successful!"
             }
