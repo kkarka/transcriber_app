@@ -1,27 +1,29 @@
 import jenkins.model.*
 import com.cloudbees.plugins.credentials.*
 import com.cloudbees.plugins.credentials.domains.*
-import org.jenkinsci.plugins.plaincredentials.impl.*
+import com.datapipe.jenkins.vault.credentials.VaultTokenCredentialImpl 
 import hudson.util.Secret
 
-println "⚙️ Running Vault Credential Init Script..."
+println "⚙️ Running Vault Token Credential Init Script..."
 
 def store = SystemCredentialsProvider.getInstance().getStore()
 def domain = Domain.global()
 
-// Define the Vault Secret Text Credential (ID: 'root', Secret: 'root')
-def vaultCred = new StringCredentialsImpl(
-  CredentialsScope.GLOBAL,
-  "root",                     
-  "Automated Vault Root Token",    
-  Secret.fromString("root")   
+// Define the exact Vault Token Credential from your screenshot
+// Parameters: Scope, ID, Description, Token
+def vaultToken = new VaultTokenCredentialImpl(
+    CredentialsScope.GLOBAL,
+    "root", 
+    "Automated Vault Root Token", 
+    Secret.fromString("root")
 )
 
-// Check if it already exists so we don't duplicate it
-def existing = store.getCredentials(domain).find { it.id == vaultCred.id }
+// Check if it already exists to avoid duplicates
+def existing = store.getCredentials(domain).find { it.id == vaultToken.id }
+
 if (existing == null) {
-    store.addCredentials(domain, vaultCred)
-    println "✅ Successfully created Vault token credential with ID 'root'!"
+    store.addCredentials(domain, vaultToken)
+    println "✅ Successfully created 'Vault Token' credential with ID 'root'!"
 } else {
-    println "ℹ️ Vault token credential already exists. Skipping."
+    println "ℹ️ Vault Token credential 'root' already exists. Skipping."
 }

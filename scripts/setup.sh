@@ -64,9 +64,17 @@ fi
 
 echo "⏳ Waiting for Vault to fully initialize..."
 VAULT_READY=false
-for i in {1..30}; do
-    if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8200/v1/sys/health | grep -q "200"; then
-        echo "✅ Vault is online and ready!"
+# Increase attempts to 60 (2 minutes total)
+for i in {1..60}; do
+    # Try the API first
+    if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8200/v1/sys/health | grep -qE "200|501"; then
+        echo "✅ Vault API is responding!"
+        VAULT_READY=true
+        break
+    fi
+    # Fallback: Try the internal CLI check
+    if docker exec vault vault status > /dev/null 2>&1; then
+        echo "✅ Vault CLI reports ready!"
         VAULT_READY=true
         break
     fi
@@ -184,15 +192,22 @@ else
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
     helm repo update
     
-    if helm ls -n monitoring | grep -q prometheus; then
-        echo "✅ Prometheus/Grafana stack is already installed."
-    else
-        echo "🚀 Installing kube-prometheus-stack..."
-        helm install prometheus prometheus-community/kube-prometheus-stack \
-            --namespace monitoring \
-            -f infrastructure/kubernetes/grafana-values.yaml \
-            --timeout 10m
-    fi
+    # 🚀 Step A: Install/Upgrade the Stack
+    echo "📦 Syncing kube-prometheus-stack (Revision 5+)..."
+    helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+        --namespace monitoring \
+        -f infrastructure/kubernetes/grafana-values.yaml \
+        --set prometheusOperator.createCustomResource=false \
+        --timeout 10m
+
+    # 🚀 Step B: Apply Custom Rules & Dashboards
+    echo "💉 Injecting Custom Alerts & Dashboards..."
+    kubectl apply -f infrastructure/kubernetes/custom-alerts.yaml -n monitoring
+    kubectl apply -f infrastructure/kubernetes/grafana-dashboard.yaml -n monitoring
+
+    # 🚀 Step C: The "Kick" (Ensure the Operator sees the new rules)
+    echo "🔄 Refreshing Monitoring Operator..."
+    kubectl rollout restart deployment prometheus-kube-prometheus-operator -n monitoring
 fi
 
 
@@ -225,6 +240,8 @@ echo "🔗 Jenkins:       http://localhost:8080"
 echo "🔗 Vault:         http://localhost:8200 (Login Token: root)"
 echo "🔗 GitHub Webhook: https://nonfossiliferous-jovanni-geophilous.ngrok-free.dev"
 echo "🔗 Grafana:        http://localhost/grafana"
+echo "💡 To view Prometheus Rules: kubectl port-forward svc/prometheus-kube-prometheus-prometheus -n monitoring 9090:9090"
+echo "💡 To view Alerts:         kubectl port-forward svc/prometheus-kube-prometheus-alertmanager -n monitoring 9093:9093"
 echo "=========================================="
 
 echo "🔍 Performing Final Health Check..."
