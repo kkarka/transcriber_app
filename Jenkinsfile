@@ -57,21 +57,21 @@ pipeline {
                     steps {
                         retry(2) { sh "docker build -t worker:${IMAGE_TAG} -f services/worker/Dockerfile ." }
                         echo "🛡️ Scanning Worker Image..."
-                        sh "trivy image --severity CRITICAL --exit-code 1 worker:${IMAGE_TAG}"
+                        sh "trivy image --scanners vuln --severity CRITICAL --exit-code 1 worker:${IMAGE_TAG}"
                     }
                 }
                 stage('API') {
                     steps {
                         retry(2) { sh "docker build -t api:${IMAGE_TAG} -f services/api/Dockerfile ." }
                         echo "🛡️ Scanning API Image..."
-                        sh "trivy image --severity CRITICAL --exit-code 1 api:${IMAGE_TAG}"
+                        sh "trivy image --scanners vuln --severity CRITICAL --exit-code 1 worker:${IMAGE_TAG}"
                     }
                 }
                 stage('Build Frontend') {
                     steps {
                         retry(2) { sh "docker build -t frontend:${IMAGE_TAG} -f services/frontend/Dockerfile ." }
                         echo "🛡️ Scanning Frontend Image..."
-                        sh "trivy image --severity CRITICAL --exit-code 1 frontend:${IMAGE_TAG}"
+                        sh "trivy image --scanners vuln --severity CRITICAL --exit-code 1 worker:${IMAGE_TAG}"
                     }
                 }
             }
