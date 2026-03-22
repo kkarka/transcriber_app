@@ -68,7 +68,8 @@ fi
 echo "⏳ Waiting for Vault to fully initialize..."
 VAULT_READY=false
 for i in {1..30}; do
-    if docker exec -e VAULT_ADDR=http://127.0.0.1:8200 vault vault status > /dev/null 2>&1; then
+    # Simply tell the CLI to hit the standard local address
+    if curl -s http://127.0.0.1:8200/v1/sys/health | grep -q '"initialized":true'; then
         echo "✅ Vault is online and ready!"
         VAULT_READY=true
         break
@@ -193,7 +194,8 @@ else
         echo "🚀 Installing kube-prometheus-stack..."
         helm install prometheus prometheus-community/kube-prometheus-stack \
             --namespace monitoring \
-            -f infrastructure/kubernetes/grafana-values.yaml
+            -f infrastructure/kubernetes/grafana-values.yaml \
+            --timeout 10m
     fi
 fi
 
