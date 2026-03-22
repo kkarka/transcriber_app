@@ -11,7 +11,6 @@ pipeline {
         stage('Connect to Vault') {
             steps {
                 echo "Attempting to fetch secrets from Vault..."
-                // Keeping these inside the environment so they are available to all stages
                 withVault(configuration: [timeout: 60, vaultCredentialId: 'root', vaultUrl: "${VAULT_URL}"], 
                   vaultSecrets: [
                       [path: 'secret/transcriber-app', secretValues: [
@@ -23,7 +22,6 @@ pipeline {
 
                     echo "Injecting secrets into Kubernetes..."
                     sh """
-                        # Create the secret cleanly (updates it if it already exists)
                         kubectl create secret generic transcriber-secrets \
                           --from-literal=REDIS_PASS=\$REDIS_PASS \
                           --from-literal=GITHUB_TOKEN=\$GITHUB_TOKEN \
@@ -57,7 +55,6 @@ pipeline {
         stage('Test & QA') {
             steps {
                 echo "Running unit tests..."
-                // PYTHONPATH=. ensures the app code is discoverable by the test runner
                 sh """
                     docker run --rm -u root \
                     -e ENV=testing \
@@ -69,28 +66,9 @@ pipeline {
             }
         }
         
-        stage('Deploy Cluster Prerequisites') {
-            steps {
-                echo "Installing/Updating Metrics Server..."
-                sh '''
-                    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml || true
-                    kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' || true
-                '''
-
-                echo "Installing/Updating KEDA via Helm..."
-                sh '''
-                    helm repo add kedacore https://kedacore.github.io/charts
-                    helm repo update
-                    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --timeout 10m
-                '''
-                echo "✅ Infrastructure Prerequisites Ready!"
-            }
-        }
-        
         stage('Deploy to Kubernetes') {
             steps {
                 echo "Batch loading images into KIND cluster..."
-                // Breaking this into multiple lines ensures the shell interprets it correctly
                 sh """
                     kind load docker-image worker:${IMAGE_TAG} --name transcriber-cluster
                     kind load docker-image api:${IMAGE_TAG} --name transcriber-cluster
