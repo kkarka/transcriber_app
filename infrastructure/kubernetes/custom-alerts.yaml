@@ -1,0 +1,40 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: transcriber-custom-alerts
+  namespace: monitoring
+  labels:
+    # 🌟 THIS LABEL IS THE KEY: It tells Prometheus "I am a rule, please read me!"
+    release: prometheus
+    app: kube-prometheus-stack
+    prometheus: prometheus-kube-prometheus-prometheus
+spec:
+  groups:
+    - name: Alerts_Group
+      rules:
+        - alert: HighLatency
+          expr: histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket[5m]))) > 0.5
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High Latency on {{ $labels.handler }}"
+            description: "P95 Latency is {{ $value }}s on handler {{ $labels.handler }}"
+    - name: keda-scaling-rules
+      rules:
+        - alert: KedaScaleStuck
+          expr: kube_deployment_status_replicas_ready{deployment="worker"} < kube_deployment_spec_replicas{deployment="worker"}
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "KEDA Scale-Up Stuck"
+            description: "Worker deployment has {{ $value }} ready pods, but KEDA is requesting more."
+        - alert: RedisQueueBacklog
+          expr: keda_scaler_metrics_value{scaledObject="worker-keda-scaler"} > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Transcription Backlog High"
+            description: "There are currently {{ $value }} videos waiting in the Redis queue."
