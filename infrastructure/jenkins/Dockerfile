@@ -33,3 +33,7 @@ RUN jenkins-plugin-cli --plugins \
     git \
     docker-workflow \
     pipeline-stage-view
+    
+# Force ownership to the jenkins user so it can execute them on startup
+COPY --chown=jenkins:jenkins infrastructure/jenkins/vault-cred.groovy /usr/share/jenkins/ref/init.groovy.d/
+COPY --chown=jenkins:jenkins infrastructure/jenkins/create-job.groovy /usr/share/jenkins/ref/init.groovy.d/

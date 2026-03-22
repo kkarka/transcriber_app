@@ -81,7 +81,7 @@ pipeline {
                 sh '''
                     helm repo add kedacore https://kedacore.github.io/charts
                     helm repo update
-                    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --wait
+                    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --timeout 10m
                 '''
                 echo "✅ Infrastructure Prerequisites Ready!"
             }
