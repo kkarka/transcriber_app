@@ -168,6 +168,28 @@ else
     echo "=========================================="
 fi
 
+# ==========================================
+# 3.5 SONARQUBE
+# ==========================================
+echo "🛡️ Setting up SonarQube for Code Quality..."
+
+if [ "$(docker ps -aq -f name=^sonarqube$)" ]; then
+    if [ "$(docker inspect -f '{{.State.Running}}' sonarqube)" == "true" ]; then
+        echo "✅ SonarQube container is already running."
+    else
+        echo "🔄 Starting existing SonarQube container..."
+        docker start sonarqube
+    fi
+else
+    echo "🚀 Creating new SonarQube container..."
+    # SonarQube needs a bit more RAM, it's a heavy Java app!
+    docker run -d \
+      --name sonarqube \
+      --network kind \
+      -p 9000:9000 \
+      sonarqube:lts-community
+fi
+
 
 # ==========================================
 # 4. NGROK TUNNEL
@@ -266,6 +288,17 @@ fi
 ./venv/bin/pip install aiohttp --quiet
 
 echo "✅ Stress test environment ready! Run: source venv/bin/activate && python3 scripts/stress_test.py"
+
+
+# ==========================================
+# 9. SONARQUBE API CONFIGURATION
+# ==========================================
+echo "⚙️ Configuring SonarQube API & Webhooks..."
+# Ensure requests is installed in your venv
+./venv/bin/pip install requests --quiet
+./venv/bin/python3 scripts/setup_sonarqube.py
+
+
 echo ""
 echo "✨ APP ACCESS READY ✨"
 echo "Your NGINX Gateway is routing traffic directly from your localhost to the cluster."
