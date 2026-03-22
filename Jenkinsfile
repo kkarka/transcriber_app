@@ -32,21 +32,46 @@ pipeline {
             }
         }
         
-        stage('Build Artifacts') {
-            parallel {
-                stage('Build Worker') {
-                    steps {
-                        retry(2) { sh "docker build -t worker:${IMAGE_TAG} -f services/worker/Dockerfile ." }
+
+        stage('Static Analysis & Quality Gate') {
+            steps {
+                script {
+                    // 🔍 Step 1: Run SonarQube Scanner
+                    // This uses the sonar-project.properties we created
+                    withSonarQubeEnv('SonarQube-Server') {
+                        sh 'sonar-scanner'
+                    }
+                    
+                    // 🚦 Step 2: Pause until SonarQube results are in
+                    // Pipeline will fail here if Quality Gate fails
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
                     }
                 }
-                stage('Build API') {
+            }
+        }
+
+        stage('Build Artifacts & Security Scan') {
+            parallel {
+                stage('Worker') {
+                    steps {
+                        retry(2) { sh "docker build -t worker:${IMAGE_TAG} -f services/worker/Dockerfile ." }
+                        echo "🛡️ Scanning Worker Image..."
+                        sh "trivy image --severity CRITICAL --exit-code 1 worker:${IMAGE_TAG}"
+                    }
+                }
+                stage('API') {
                     steps {
                         retry(2) { sh "docker build -t api:${IMAGE_TAG} -f services/api/Dockerfile ." }
+                        echo "🛡️ Scanning API Image..."
+                        sh "trivy image --severity CRITICAL --exit-code 1 api:${IMAGE_TAG}"
                     }
                 }
                 stage('Build Frontend') {
                     steps {
                         retry(2) { sh "docker build -t frontend:${IMAGE_TAG} -f services/frontend/Dockerfile ." }
+                        echo "🛡️ Scanning Frontend Image..."
+                        sh "trivy image --severity CRITICAL --exit-code 1 frontend:${IMAGE_TAG}"
                     }
                 }
             }
