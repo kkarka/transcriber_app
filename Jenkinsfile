@@ -76,8 +76,16 @@ pipeline {
                 """
                 
                 echo "Applying Kubernetes manifests..."
-                sh 'find infrastructure/kubernetes -name "*.yaml" ! -name "kind-config.yaml" -exec kubectl apply -f {} \\;'
-                
+                sh '''
+                    find infrastructure/kubernetes -name "*.yaml" \
+                    ! -name "kind-config.yaml" \
+                    ! -name "grafana-values.yaml" \
+                    -exec kubectl apply -f {} \\;
+                '''
+
+                echo "Waiting for deployments to exist before restarting..."
+                sh "sleep 10"
+
                 echo "Restarting deployments to pick up new images..."
                 sh "kubectl rollout restart deployment worker api frontend gateway || true"
                 

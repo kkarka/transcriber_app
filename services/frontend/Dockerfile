@@ -5,7 +5,8 @@ WORKDIR /app
 
 COPY services/frontend/package*.json ./
 # Use ci for faster, cleaner, deterministic builds in automated pipelines
-RUN npm ci 
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 COPY services/frontend .
 RUN npm run build
