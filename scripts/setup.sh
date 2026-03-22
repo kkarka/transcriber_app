@@ -254,6 +254,18 @@ for container in "${containers[@]}"; do
     fi
 done
 
+# ==========================================
+# 8. PYTHON VENV SETUP (FOR SCRIPTS)
+# ==========================================
+echo "🐍 Setting up Python Virtual Environment..."
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
+
+# Ensure aiohttp is installed in the venv
+./venv/bin/pip install aiohttp --quiet
+
+echo "✅ Stress test environment ready! Run: source venv/bin/activate && python3 scripts/stress_test.py"
 echo ""
 echo "✨ APP ACCESS READY ✨"
 echo "Your NGINX Gateway is routing traffic directly from your localhost to the cluster."
