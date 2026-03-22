@@ -26,13 +26,10 @@ fi
 # ==========================================
 # 1. KUBERNETES CLUSTER (KIND)
 # ==========================================
-# CONDITION: Check if cluster already exists
 if kind get clusters | grep -q "^transcriber-cluster$"; then
     echo "✅ Kind cluster 'transcriber-cluster' already exists. Skipping creation."
 else
     echo "📦 Creating Kind cluster (transcriber-cluster) with custom networking..."
-    # CRITICAL UPDATE: Passing the config file so extraPortMappings are applied!
-    # Note: Adjust the path to kind-config.yaml if it is not in your root directory.
     kind create cluster --name transcriber-cluster --config infrastructure/kubernetes/kind-config.yaml --image kindest/node:v1.30.0 || { echo "❌ Failed to create cluster"; exit 1; }
 fi
 
@@ -68,7 +65,6 @@ fi
 echo "⏳ Waiting for Vault to fully initialize..."
 VAULT_READY=false
 for i in {1..30}; do
-    # Simply tell the CLI to hit the standard local address
     if curl -s http://127.0.0.1:8200/v1/sys/health | grep -q '"initialized":true'; then
         echo "✅ Vault is online and ready!"
         VAULT_READY=true
@@ -94,7 +90,6 @@ unset GITHUB_SECRET
 # ==========================================
 echo "🏗️ Checking for custom Jenkins Docker image..."
 
-# Check if the image exists locally
 if [[ "$(docker images -q custom-jenkins-devops:latest 2> /dev/null)" == "" ]]; then
     echo "📦 Image not found. Building custom Jenkins image..."
     docker build -t custom-jenkins-devops -f infrastructure/jenkins/Dockerfile .
@@ -182,7 +177,6 @@ fi
 echo "📊 Setting up Prometheus & Grafana..."
 if ! command -v helm &> /dev/null; then
     echo "⚠️ Helm is not installed. Skipping Prometheus/Grafana setup."
-    echo "   To install helm: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
 else
     kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -200,6 +194,28 @@ else
 fi
 
 
+# ==========================================
+# 6. CLUSTER PREREQUISITES (KEDA & METRICS)
+# ==========================================
+echo "⚙️ Setting up Core Cluster Prerequisites..."
+
+echo "Installing/Updating Metrics Server..."
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml || true
+kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]' || true
+
+echo "Installing/Updating KEDA via Helm..."
+if helm ls -n keda | grep -q keda; then
+    echo "✅ KEDA is already installed."
+else
+    helm repo add kedacore https://kedacore.github.io/charts
+    helm repo update
+    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --timeout 10m
+fi
+
+
+# ==========================================
+# 7. FINAL VERIFICATION
+# ==========================================
 echo "=========================================="
 echo "✅ ENVIRONMENT FULLY PROVISIONED!"
 echo "=========================================="
