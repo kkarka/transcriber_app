@@ -8,26 +8,26 @@ USER root
 RUN apt-get update && \
     apt-get install -y docker.io curl wget gnupg lsb-release unzip && \
     \
-    # --- 🛡️ Install Trivy (Vulnerability Scanner) ---
-    wget -qO - https://aquasecurity.github.io/trivy-repo/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null && \
-    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee -a /etc/apt/sources.list.d/trivy.list && \
-    apt-get update && apt-get install -y trivy && \
+    echo "Installing Trivy v0.69.3..." && \
+    wget https://github.com/aquasecurity/trivy/releases/download/v0.69.3/trivy_0.69.3_Linux-64bit.deb && \
+    dpkg -i trivy_0.69.3_Linux-64bit.deb && \
+    rm trivy_0.69.3_Linux-64bit.deb && \
     \
-    # --- 🏗️ Install Sonar Scanner ---
+    echo "--- Install Sonar Scanner ---" && \
     curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip && \
-    unzip /tmp/sonar-scanner.zip -d /opt && \
+    unzip -q /tmp/sonar-scanner.zip -d /opt && \
     ln -s /opt/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner /usr/local/bin/sonar-scanner && \
     \
-    # --- 📦 Install KIND ---
+    echo "--- Install KIND ---" && \
     curl -Lo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64 && \
     chmod +x /usr/local/bin/kind && \
     \
-    # --- 🔑 Install kubectl ---
+    echo "--- Install kubectl ---" && \
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x ./kubectl && \
     mv ./kubectl /usr/local/bin/kubectl && \
     \
-    # --- 🚢 Install Helm ---
+    echo "--- Install Helm ---" && \
     curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
     chmod 700 get_helm.sh && \
     ./get_helm.sh && \
@@ -44,7 +44,7 @@ RUN jenkins-plugin-cli --plugins \
     git \
     docker-workflow \
     pipeline-stage-view \
-    sonar
+    sonar:2.18.2
 
 # Force ownership to the jenkins user
 COPY --chown=jenkins:jenkins infrastructure/jenkins/vault-cred.groovy /usr/share/jenkins/ref/init.groovy.d/
